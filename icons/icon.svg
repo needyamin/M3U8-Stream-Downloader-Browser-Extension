@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#gradient)" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Play button triangle -->
+  <polygon points="50,40 50,88 90,64" fill="#ffffff" opacity="0.9"/>
+  
+  <!-- Download arrow -->
+  <g transform="translate(80, 25)">
+    <!-- Arrow shaft -->
+    <rect x="18" y="5" width="4" height="20" fill="#ffffff" opacity="0.8"/>
+    <!-- Arrow head -->
+    <polygon points="16,20 24,20 20,28" fill="#ffffff" opacity="0.8"/>
+  </g>
+  
+  <!-- Small streaming lines -->
+  <g opacity="0.6">
+    <path d="M25 25 L35 35" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    <path d="M20 35 L30 45" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    <path d="M25 45 L35 55" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg> 

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>M3U8 Stream Downloader - SVG to PNG Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .icon-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        canvas {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            margin: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        button {
+            padding: 12px 24px;
+            margin: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .preview-img {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: white;
+            padding: 10px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        #hiddenSvg {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 M3U8 Stream Downloader</h1>
+        <p class="subtitle">Icon Generator - Convert SVG to PNG</p>
+        
+        <!-- Hidden SVG for conversion -->
+        <div id="hiddenSvg">
+            <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" id="iconSvg">
+                <defs>
+                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                
+                <!-- Background circle -->
+                <circle cx="64" cy="64" r="60" fill="url(#gradient)" stroke="#ffffff" stroke-width="2"/>
+                
+                <!-- Play button triangle -->
+                <polygon points="50,40 50,88 90,64" fill="#ffffff" opacity="0.9"/>
+                
+                <!-- Download arrow -->
+                <g transform="translate(80, 25)">
+                    <!-- Arrow shaft -->
+                    <rect x="18" y="5" width="4" height="20" fill="#ffffff" opacity="0.8"/>
+                    <!-- Arrow head -->
+                    <polygon points="16,20 24,20 20,28" fill="#ffffff" opacity="0.8"/>
+                </g>
+                
+                <!-- Small streaming lines -->
+                <g opacity="0.6">
+                    <path d="M25 25 L35 35" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M20 35 L30 45" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M25 45 L35 55" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                </g>
+            </svg>
+        </div>
+        
+        <div class="icon-container">
+            <h3>📋 Preview</h3>
+            <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" class="preview-img">
+                <defs>
+                    <linearGradient id="gradient-preview" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                
+                <!-- Background circle -->
+                <circle cx="64" cy="64" r="60" fill="url(#gradient-preview)" stroke="#ffffff" stroke-width="2"/>
+                
+                <!-- Play button triangle -->
+                <polygon points="50,40 50,88 90,64" fill="#ffffff" opacity="0.9"/>
+                
+                <!-- Download arrow -->
+                <g transform="translate(80, 25)">
+                    <!-- Arrow shaft -->
+                    <rect x="18" y="5" width="4" height="20" fill="#ffffff" opacity="0.8"/>
+                    <!-- Arrow head -->
+                    <polygon points="16,20 24,20 20,28" fill="#ffffff" opacity="0.8"/>
+                </g>
+                
+                <!-- Small streaming lines -->
+                <g opacity="0.6">
+                    <path d="M25 25 L35 35" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M20 35 L30 45" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M25 45 L35 55" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                </g>
+            </svg>
+        </div>
+        
+        <div class="icon-container">
+            <h3>💾 Download PNG Icons</h3>
+            <p>Click each button to download the required PNG files:</p>
+            
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 15px 0;">
+                <canvas id="canvas16" width="16" height="16"></canvas>
+                <button onclick="downloadIcon(16)">📥 Download icon16.png (16×16)</button>
+            </div>
+            
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 15px 0;">
+                <canvas id="canvas32" width="32" height="32"></canvas>
+                <button onclick="downloadIcon(32)">📥 Download icon32.png (32×32)</button>
+            </div>
+            
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 15px 0;">
+                <canvas id="canvas48" width="48" height="48"></canvas>
+                <button onclick="downloadIcon(48)">📥 Download icon48.png (48×48)</button>
+            </div>
+            
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 15px 0;">
+                <canvas id="canvas128" width="128" height="128"></canvas>
+                <button onclick="downloadIcon(128)">📥 Download icon128.png (128×128)</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📝 Instructions</h3>
+            <ol>
+                <li>Click each download button above to save the PNG files</li>
+                <li>Save all files in the <code>icons/</code> directory of your extension</li>
+                <li>Make sure the filenames are exactly: <code>icon16.png</code>, <code>icon32.png</code>, <code>icon48.png</code>, <code>icon128.png</code></li>
+                <li>Once all 4 files are in place, your browser extension will be ready to install!</li>
+            </ol>
+            
+            <div style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 5px;">
+                <strong>💡 Tip:</strong> After downloading, go to <code>chrome://extensions/</code>, enable Developer mode, and click "Load unpacked" to install your extension!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Convert SVG to data URL
+        function svgToDataURL(svg, callback) {
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            
+            const img = new Image();
+            img.onload = function() {
+                callback(img);
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        function downloadIcon(size) {
+            const canvas = document.getElementById('canvas' + size);
+            const ctx = canvas.getContext('2d');
+            const svg = document.getElementById('iconSvg');
+            
+            svgToDataURL(svg, function(img) {
+                ctx.clearRect(0, 0, size, size);
+                ctx.drawImage(img, 0, 0, size, size);
+                
+                // Download the canvas as PNG
+                const link = document.createElement('a');
+                link.download = 'icon' + size + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                // Visual feedback
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = '✅ Downloaded!';
+                button.style.background = 'rgba(0, 255, 0, 0.3)';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = 'rgba(255, 255, 255, 0.2)';
+                }, 2000);
+            });
+        }
+        
+        // Auto-load preview canvases
+        window.onload = function() {
+            const svg = document.getElementById('iconSvg');
+            
+            [16, 32, 48, 128].forEach(size => {
+                const canvas = document.getElementById('canvas' + size);
+                const ctx = canvas.getContext('2d');
+                
+                svgToDataURL(svg, function(img) {
+                    ctx.drawImage(img, 0, 0, size, size);
+                });
+            });
+        };
+    </script>
+</body>
+</html> 

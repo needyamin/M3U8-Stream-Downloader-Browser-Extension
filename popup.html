@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>M3U8 Stream Downloader</title>
+  <title>Universal Media Downloader</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <header class="header">
       <div class="logo">
-        <h1>🎬 M3U8 Downloader</h1>
-        <p>Detect & Download HLS Streams</p>
+        <h1>🎬 Media Downloader</h1>
+        <p>Download Video, Audio & Streaming Files</p>
       </div>
       <div class="stats">
-        <span id="streamCount">0</span> streams detected
+        <span id="streamCount">0</span> media files detected
       </div>
     </header>
 
@@ -39,29 +39,30 @@
     <div class="content">
       <div id="loadingIndicator" class="loading">
         <div class="spinner"></div>
-        <p>Scanning for M3U8 streams...</p>
+        <p>Scanning for media files...</p>
       </div>
 
       <div id="noStreams" class="no-streams" style="display: none;">
         <div class="empty-state">
-          <h3>🔍 No M3U8 streams detected</h3>
-          <p>Navigate to a page with HLS video content or refresh this popup.</p>
+          <h3>🔍 No media files detected</h3>
+          <p>Navigate to a page with video or audio content, or refresh this popup.</p>
           <ul class="tips">
-            <li>Try visiting video streaming sites</li>
-            <li>Look for sites with .m3u8 video content</li>
+            <li>Visit video streaming sites (YouTube, Vimeo, etc.)</li>
+            <li>Look for MP4, MP3, M3U8, and other media files</li>
+            <li>Play a video to help detection</li>
             <li>Make sure the page has loaded completely</li>
           </ul>
         </div>
       </div>
 
       <div id="streamsList" class="streams-list" style="display: none;">
-        <!-- Streams will be populated here -->
+        <!-- Media files will be populated here -->
       </div>
     </div>
 
     <footer class="footer">
       <div class="help-text">
-        <small>💡 This extension detects M3U8 HLS streams and downloads them in segments using multiple threads for faster downloads.</small>
+        <small>💡 This extension detects all types of media files: MP4, AVI, MP3, FLAC, M3U8 streams, and more. Click download to save them to your computer.</small>
       </div>
     </footer>
   </div>

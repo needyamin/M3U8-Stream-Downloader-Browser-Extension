@@ -9,7 +9,9 @@ class M3U8PopupManager {
   init() {
     this.setupEventListeners();
     this.loadStreams();
-    this.startAutoRefresh();
+    // DISABLED: No more auto-refresh or user tracking
+    // this.startAutoRefresh();
+    // this.trackUserInteraction();
   }
 
   setupEventListeners() {
@@ -23,12 +25,12 @@ class M3U8PopupManager {
       this.clearAllStreams();
     });
 
-    // Listen for background script messages
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (request.type === 'STREAM_DETECTED') {
-        this.loadStreams();
-      }
-    });
+    // DISABLED: Message listener that may cause constant updates
+    // chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    //   if (request.type === 'STREAM_DETECTED') {
+    //     this.loadStreams();
+    //   }
+    // });
   }
 
   async loadStreams() {
@@ -49,23 +51,48 @@ class M3U8PopupManager {
     const noStreams = document.getElementById('noStreams');
     const streamsList = document.getElementById('streamsList');
 
-    // Update stream count
-    streamCount.textContent = streamsData.length;
+    // Only update stream count if it actually changed
+    const newCount = streamsData.length;
+    if (streamCount.textContent !== newCount.toString()) {
+      streamCount.textContent = newCount;
+    }
 
     // Hide loading indicator
-    loadingIndicator.style.display = 'none';
+    if (loadingIndicator.style.display !== 'none') {
+      loadingIndicator.style.display = 'none';
+    }
 
     if (streamsData.length === 0) {
-      noStreams.style.display = 'block';
-      streamsList.style.display = 'none';
+      if (noStreams.style.display !== 'block') {
+        noStreams.style.display = 'block';
+      }
+      if (streamsList.style.display !== 'none') {
+        streamsList.style.display = 'none';
+      }
       return;
     }
 
-    noStreams.style.display = 'none';
-    streamsList.style.display = 'block';
+    if (noStreams.style.display !== 'none') {
+      noStreams.style.display = 'none';
+    }
+    if (streamsList.style.display !== 'block') {
+      streamsList.style.display = 'block';
+    }
 
-    // Clear existing streams
-    streamsList.innerHTML = '';
+    // Check if streams have actually changed before rebuilding
+    const currentStreamIds = Array.from(this.streams.keys()).sort();
+    const newStreamIds = streamsData.map(([id]) => id).sort();
+    const hasChanges = JSON.stringify(currentStreamIds) !== JSON.stringify(newStreamIds);
+
+    // Only rebuild if there are actual changes
+    if (!hasChanges && streamsList.children.length > 0) {
+      return; // No changes, don't rebuild UI
+    }
+
+    // Clear existing streams only if needed
+    if (streamsList.children.length > 0) {
+      streamsList.innerHTML = '';
+    }
 
     // Add each stream
     streamsData.forEach(([streamId, streamData]) => {
@@ -77,7 +104,7 @@ class M3U8PopupManager {
 
   createStreamElement(streamId, streamData) {
     const streamItem = document.createElement('div');
-    streamItem.className = 'stream-item new';
+    streamItem.className = 'stream-item';
     streamItem.innerHTML = `
       <div class="stream-header">
         <div class="stream-url" title="${streamData.url}">
@@ -88,6 +115,11 @@ class M3U8PopupManager {
         </div>
       </div>
       
+      <div class="stream-info">
+        <span><strong>Type:</strong> ${streamData.type || 'Media File'}</span>
+        <span><strong>Size:</strong> ${streamData.fileSize || 'Unknown'}</span>
+      </div>
+      
       <div class="stream-actions">
         <input type="text" class="filename-input" placeholder="Enter filename (optional)" 
                value="${this.generateFilename(streamData.url)}">
@@ -96,7 +128,7 @@ class M3U8PopupManager {
         </button>
       </div>
       
-      <div class="stream-info">
+      <div class="stream-details">
         <span>Detected: ${this.formatDate(streamData.detected)}</span>
         <span>Tab ID: ${streamData.tabId}</span>
       </div>
@@ -184,8 +216,13 @@ class M3U8PopupManager {
   }
 
   truncateUrl(url) {
-    if (url.length <= 50) return url;
-    return url.substring(0, 25) + '...' + url.substring(url.length - 25);
+    if (!url) return 'Unknown URL';
+    if (url.length <= 40) return url;
+    
+    // Consistent truncation to prevent layout shifts
+    const start = url.substring(0, 20);
+    const end = url.substring(url.length - 15);
+    return start + '...' + end;
   }
 
   getStatusText(status) {
@@ -200,12 +237,27 @@ class M3U8PopupManager {
 
   generateFilename(url) {
     try {
+      if (!url) return 'media';
+      
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const filename = pathname.split('/').pop().replace('.m3u8', '');
-      return filename || 'stream';
+      let filename = pathname.split('/').pop();
+      
+      if (!filename || filename.length < 2) {
+        filename = 'media';
+      }
+      
+      // Remove extension for input field
+      filename = filename.replace(/\.[^/.]+$/, '');
+      
+      // Limit filename length to prevent layout issues
+      if (filename.length > 20) {
+        filename = filename.substring(0, 20);
+      }
+      
+      return filename || 'media';
     } catch (e) {
-      return 'stream';
+      return 'media';
     }
   }
 
@@ -215,23 +267,30 @@ class M3U8PopupManager {
   }
 
   showNotification(message, type = 'info') {
-    // Create notification element
+    // Simplified static notification to prevent layout shifts
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // Create a simple non-animated notification
+    const existing = document.querySelector('.static-notification');
+    if (existing) {
+      existing.remove();
+    }
+    
     const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
+    notification.className = 'static-notification';
     notification.textContent = message;
     notification.style.cssText = `
       position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 16px;
-      border-radius: 6px;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      border-radius: 4px;
       color: white;
-      font-size: 14px;
-      font-weight: 500;
-      z-index: 1000;
-      opacity: 0;
-      transform: translateX(100%);
-      transition: all 0.3s ease;
+      font-size: 12px;
+      z-index: 10000;
+      max-width: 180px;
+      word-wrap: break-word;
+      pointer-events: none;
     `;
     
     // Set background color based on type
@@ -245,22 +304,12 @@ class M3U8PopupManager {
     
     document.body.appendChild(notification);
     
-    // Animate in
+    // Remove after delay without any animation
     setTimeout(() => {
-      notification.style.opacity = '1';
-      notification.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Remove after delay
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 2000);
   }
 
   showError(message) {
@@ -277,10 +326,13 @@ class M3U8PopupManager {
   }
 
   startAutoRefresh() {
-    // Refresh every 5 seconds
-    this.refreshInterval = setInterval(() => {
-      this.loadStreams();
-    }, 5000);
+    // DISABLED: Auto-refresh causing shaking - only manual refresh now
+    // this.refreshInterval = setInterval(() => {
+    //   const timeSinceInteraction = Date.now() - this.lastUserInteraction;
+    //   if (document.visibilityState === 'visible' && timeSinceInteraction > 3000) {
+    //     this.loadStreams();
+    //   }
+    // }, 10000);
   }
 
   stopAutoRefresh() {

@@ -1,14 +1,13 @@
-// Background script for M3U8 Stream Downloader
-class M3U8Downloader {
+// Universal Media Downloader - Background Script
+class MediaDownloader {
   constructor() {
     this.detectedStreams = new Map();
     this.downloadQueue = new Map();
-    this.maxConcurrentDownloads = 6;
     this.init();
   }
 
   init() {
-    // Listen for web requests to detect M3U8 files
+    // Listen for web requests to detect media files
     chrome.webRequest.onBeforeRequest.addListener(
       this.onBeforeRequest.bind(this),
       { urls: ["<all_urls>"] },
@@ -26,36 +25,144 @@ class M3U8Downloader {
   }
 
   onBeforeRequest(details) {
-    if (details.url.includes('.m3u8') || details.url.includes('m3u8')) {
+    if (this.isMediaUrl(details.url)) {
       this.addDetectedStream(details.url, details.tabId);
     }
   }
 
   onResponseStarted(details) {
     const contentType = this.getHeader(details.responseHeaders, 'content-type');
-    if (contentType && (
-      contentType.includes('application/x-mpegURL') ||
-      contentType.includes('application/vnd.apple.mpegurl') ||
-      details.url.includes('.m3u8')
-    )) {
+    if (this.isMediaContentType(contentType) || this.isMediaUrl(details.url)) {
       this.addDetectedStream(details.url, details.tabId);
     }
   }
 
+  isMediaUrl(url) {
+    if (!url) return false;
+    
+    const mediaExtensions = [
+      // Video formats
+      '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ogv',
+      '.ts', '.m2ts', '.mts', '.vob', '.asf', '.rm', '.rmvb', '.divx', '.xvid',
+      // Audio formats  
+      '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus', '.aiff', '.ape',
+      // Streaming formats
+      '.m3u8', '.mpd', '.ism', '.f4v', '.f4a'
+    ];
+    
+    const mediaPatterns = [
+      'videoplayback', 'video_ts', 'playlist.m3u8', 'index.m3u8', 'master.m3u8',
+      'manifest.mpd', 'chunk_', 'segment_', 'frag_', 'init.mp4'
+    ];
+    
+    const urlLower = url.toLowerCase();
+    
+    return mediaExtensions.some(ext => urlLower.includes(ext)) ||
+           mediaPatterns.some(pattern => urlLower.includes(pattern));
+  }
+
+  isMediaContentType(contentType) {
+    if (!contentType) return false;
+    
+    const mediaTypes = [
+      'video/', 'audio/', 'application/x-mpegurl', 'application/vnd.apple.mpegurl',
+      'application/dash+xml', 'application/f4v', 'application/f4a',
+      'application/x-flv', 'application/x-shockwave-flash'
+    ];
+    
+    return mediaTypes.some(type => contentType.toLowerCase().includes(type));
+  }
+
   addDetectedStream(url, tabId) {
+    // Skip very small files and common non-media patterns
+    if (this.shouldSkipUrl(url)) return;
+    
     const streamId = `${tabId}_${Date.now()}_${Math.random()}`;
+    const mediaType = this.getMediaType(url);
+    const fileSize = this.extractFileSize(url);
+    
     this.detectedStreams.set(streamId, {
       url: url,
       tabId: tabId,
       detected: new Date(),
-      status: 'detected'
+      status: 'detected',
+      type: mediaType,
+      fileSize: fileSize
     });
 
     // Notify popup if open
     chrome.runtime.sendMessage({
       type: 'STREAM_DETECTED',
-      stream: { id: streamId, url: url, tabId: tabId }
+      stream: { id: streamId, url: url, tabId: tabId, type: mediaType }
     }).catch(() => {}); // Ignore if popup not open
+  }
+
+  shouldSkipUrl(url) {
+    const skipPatterns = [
+      'favicon', 'thumbnail', 'preview', 'poster', 'logo', 'icon',
+      'analytics', 'tracking', 'beacon', 'pixel', 'ad.', 'ads.',
+      '.gif', '.jpg', '.jpeg', '.png', '.webp', '.svg'
+    ];
+    
+    const urlLower = url.toLowerCase();
+    return skipPatterns.some(pattern => urlLower.includes(pattern)) ||
+           url.length > 2000; // Skip extremely long URLs
+  }
+
+  getMediaType(url) {
+    const urlLower = url.toLowerCase();
+    
+    // Video formats
+    if (urlLower.includes('.mp4') || urlLower.includes('video/mp4')) return 'Video (MP4)';
+    if (urlLower.includes('.webm')) return 'Video (WebM)';
+    if (urlLower.includes('.avi')) return 'Video (AVI)';
+    if (urlLower.includes('.mkv')) return 'Video (MKV)';
+    if (urlLower.includes('.mov')) return 'Video (MOV)';
+    if (urlLower.includes('.flv')) return 'Video (FLV)';
+    if (urlLower.includes('.ts') || urlLower.includes('.m2ts')) return 'Video (TS)';
+    
+    // Audio formats
+    if (urlLower.includes('.mp3')) return 'Audio (MP3)';
+    if (urlLower.includes('.wav')) return 'Audio (WAV)';
+    if (urlLower.includes('.flac')) return 'Audio (FLAC)';
+    if (urlLower.includes('.aac')) return 'Audio (AAC)';
+    if (urlLower.includes('.ogg')) return 'Audio (OGG)';
+    if (urlLower.includes('.m4a')) return 'Audio (M4A)';
+    
+    // Streaming formats
+    if (urlLower.includes('.m3u8') || urlLower.includes('m3u8')) return 'HLS Stream (M3U8)';
+    if (urlLower.includes('.mpd')) return 'DASH Stream (MPD)';
+    
+    // Generic detection based on content or URL patterns
+    if (urlLower.includes('video')) return 'Video';
+    if (urlLower.includes('audio')) return 'Audio';
+    
+    return 'Media File';
+  }
+
+  extractFileSize(url) {
+    // Try to extract file size from URL parameters
+    try {
+      const urlObj = new URL(url);
+      const sizeParam = urlObj.searchParams.get('clen') || 
+                       urlObj.searchParams.get('size') || 
+                       urlObj.searchParams.get('bytes');
+      if (sizeParam) {
+        const size = parseInt(sizeParam);
+        return this.formatFileSize(size);
+      }
+    } catch (e) {
+      // Ignore URL parsing errors
+    }
+    return 'Unknown';
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   async onMessage(request, sender, sendResponse) {
@@ -74,8 +181,8 @@ class M3U8Downloader {
         sendResponse({ success: true });
         break;
 
-      case 'M3U8_FOUND':
-        // Handle M3U8 URLs found by content script
+      case 'MEDIA_FOUND':
+        // Handle media URLs found by content script
         if (request.url && sender.tab) {
           this.addDetectedStream(request.url, sender.tab.id);
         }
@@ -91,20 +198,13 @@ class M3U8Downloader {
     try {
       stream.status = 'downloading';
       
-      // Fetch and parse M3U8 playlist
-      const playlist = await this.fetchM3U8(stream.url);
-      const segments = this.parseM3U8(playlist, stream.url);
-      
-      if (segments.length === 0) {
-        throw new Error('No segments found in M3U8 playlist');
+      if (stream.type.includes('M3U8') || stream.url.includes('.m3u8')) {
+        // Handle M3U8 streams
+        await this.downloadM3U8Stream(stream, options);
+      } else {
+        // Handle direct media files
+        await this.downloadDirectFile(stream, options);
       }
-
-      // Download segments in parallel
-      const downloadedSegments = await this.downloadSegments(segments, options);
-      
-      // Combine segments (for now, we'll download them individually)
-      // In a real implementation, you'd want to combine them into a single file
-      await this.saveSegments(downloadedSegments, options.filename || 'stream');
       
       stream.status = 'completed';
       
@@ -115,107 +215,142 @@ class M3U8Downloader {
     }
   }
 
-  async fetchM3U8(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch M3U8: ${response.status}`);
-    }
-    return await response.text();
-  }
-
-  parseM3U8(content, baseUrl) {
-    const lines = content.split('\n').map(line => line.trim());
-    const segments = [];
+  async downloadDirectFile(stream, options) {
+    const filename = this.generateFilename(stream.url, options.filename);
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      
-      // Skip comments and empty lines
-      if (line.startsWith('#') || !line) continue;
-      
-      // This is a segment URL
-      let segmentUrl = line;
-      if (!segmentUrl.startsWith('http')) {
-        // Relative URL, make it absolute
-        const base = new URL(baseUrl);
-        segmentUrl = new URL(segmentUrl, base.origin + base.pathname.substring(0, base.pathname.lastIndexOf('/') + 1)).href;
+    try {
+      // Use Chrome downloads API for direct download
+      await chrome.downloads.download({
+        url: stream.url,
+        filename: filename,
+        saveAs: false
+      });
+    } catch (error) {
+      // If direct download fails, try with fetch
+      console.log('Direct download failed, trying fetch method...');
+      const response = await fetch(stream.url);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
       }
       
-      segments.push({
-        url: segmentUrl,
-        index: segments.length
+      const blob = await response.blob();
+      const dataUrl = await this.blobToDataUrl(blob);
+      
+      await chrome.downloads.download({
+        url: dataUrl,
+        filename: filename,
+        saveAs: false
       });
     }
-    
-    return segments;
   }
 
-  async downloadSegments(segments, options) {
-    const downloadedSegments = [];
-    const concurrentLimit = Math.min(options.concurrentDownloads || this.maxConcurrentDownloads, segments.length);
-    
-    // Create chunks for parallel processing
-    const chunks = [];
-    for (let i = 0; i < segments.length; i += concurrentLimit) {
-      chunks.push(segments.slice(i, i + concurrentLimit));
-    }
-    
-    for (const chunk of chunks) {
-      const promises = chunk.map(async (segment) => {
-        try {
-          const response = await fetch(segment.url);
-          if (!response.ok) {
-            throw new Error(`Failed to download segment ${segment.index}: ${response.status}`);
-          }
-          
-          const blob = await response.blob();
-          return {
-            index: segment.index,
-            blob: blob,
-            url: segment.url
-          };
-        } catch (error) {
-          console.error(`Error downloading segment ${segment.index}:`, error);
-          return null;
-        }
+  async downloadM3U8Stream(stream, options) {
+    try {
+      // For M3U8, try to download the playlist file first
+      const playlistFilename = this.generateFilename(stream.url, options.filename, '.m3u8');
+      
+      // Download the M3U8 playlist file
+      await chrome.downloads.download({
+        url: stream.url,
+        filename: playlistFilename,
+        saveAs: false
       });
       
-      const results = await Promise.all(promises);
-      downloadedSegments.push(...results.filter(r => r !== null));
-    }
-    
-    // Sort by index to maintain order
-    return downloadedSegments.sort((a, b) => a.index - b.index);
-  }
-
-  async saveSegments(segments, filename) {
-    // For Chrome extension, we'll save each segment as a separate file
-    // In a more advanced implementation, you could combine them using FFmpeg or similar
-    
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      const paddedIndex = String(i).padStart(4, '0');
-      
+      // Optional: Also try to fetch and analyze the playlist
       try {
-        // Convert blob to data URL for download
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(segment.blob);
-        });
+        const response = await fetch(stream.url);
+        const playlist = await response.text();
         
-        // Use Chrome downloads API
+        // Create a combined playlist with absolute URLs
+        const absolutePlaylist = this.convertToAbsoluteUrls(playlist, stream.url);
+        const blob = new Blob([absolutePlaylist], { type: 'application/x-mpegURL' });
+        const dataUrl = await this.blobToDataUrl(blob);
+        
+        const absoluteFilename = this.generateFilename(stream.url, options.filename + '_absolute', '.m3u8');
         await chrome.downloads.download({
           url: dataUrl,
-          filename: `${filename}_segment_${paddedIndex}.ts`,
+          filename: absoluteFilename,
           saveAs: false
         });
         
-      } catch (error) {
-        console.error(`Failed to save segment ${i}:`, error);
+      } catch (e) {
+        console.log('Could not process M3U8 playlist:', e);
+      }
+      
+    } catch (error) {
+      throw new Error(`M3U8 download failed: ${error.message}`);
+    }
+  }
+
+  convertToAbsoluteUrls(playlist, baseUrl) {
+    const lines = playlist.split('\n');
+    const baseUrlObj = new URL(baseUrl);
+    const basePath = baseUrlObj.origin + baseUrlObj.pathname.substring(0, baseUrlObj.pathname.lastIndexOf('/') + 1);
+    
+    return lines.map(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#') && !trimmedLine.startsWith('http')) {
+        // Convert relative URL to absolute
+        return basePath + trimmedLine;
+      }
+      return line;
+    }).join('\n');
+  }
+
+  generateFilename(url, customName, extension = null) {
+    if (customName && !customName.includes('.')) {
+      // Add appropriate extension
+      if (extension) {
+        return customName + extension;
+      } else {
+        const ext = this.extractExtension(url);
+        return customName + (ext ? '.' + ext : '.mp4');
       }
     }
+    
+    if (customName) {
+      return customName;
+    }
+    
+    try {
+      const urlObj = new URL(url);
+      let filename = urlObj.pathname.split('/').pop();
+      
+      if (!filename || filename.length < 3) {
+        filename = 'media_' + Date.now();
+      }
+      
+      // Ensure it has an extension
+      if (!filename.includes('.')) {
+        const ext = this.extractExtension(url);
+        filename += '.' + (ext || 'mp4');
+      }
+      
+      return filename;
+    } catch (e) {
+      return 'media_' + Date.now() + (extension || '.mp4');
+    }
+  }
+
+  extractExtension(url) {
+    const urlLower = url.toLowerCase();
+    const extensions = ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'm3u8', 'ts'];
+    
+    for (const ext of extensions) {
+      if (urlLower.includes('.' + ext)) {
+        return ext;
+      }
+    }
+    return null;
+  }
+
+  async blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   getHeader(headers, name) {
@@ -225,4 +360,4 @@ class M3U8Downloader {
 }
 
 // Initialize the downloader
-const downloader = new M3U8Downloader(); 
+const downloader = new MediaDownloader(); 
