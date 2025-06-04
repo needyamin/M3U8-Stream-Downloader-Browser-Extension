@@ -1,0 +1,32 @@
+M3U8 STREAM DOWNLOADER - INSTALLATION GUIDE
+==========================================
+
+STEP 1: ADD ICONS (REQUIRED!)
+- Go to the "icons" folder
+- Add these PNG files:
+  * icon16.png (16x16 pixels)
+  * icon32.png (32x32 pixels)
+  * icon48.png (48x48 pixels)
+  * icon128.png (128x128 pixels)
+- See icons/ICONS_NEEDED.txt for more details
+
+STEP 2: INSTALL EXTENSION
+1. Open Chrome browser
+2. Go to chrome://extensions/
+3. Turn ON "Developer mode" (top-right toggle)
+4. Click "Load unpacked"
+5. Select this folder
+6. Extension should appear in your list
+
+STEP 3: USE THE EXTENSION
+1. Pin the extension to your toolbar
+2. Visit websites with video streams
+3. Click the extension icon
+4. Download detected M3U8 streams
+
+TROUBLESHOOTING:
+- Extension won't load = Missing icon files
+- No streams detected = Refresh page and popup
+- Downloads fail = Check internet connection
+
+For full documentation, read README.md 
