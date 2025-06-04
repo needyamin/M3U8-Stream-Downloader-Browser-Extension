@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Media Downloader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <h1>🎬 Media Downloader</h1>
+        <p>Download Video, Audio & Streaming Files</p>
+      </div>
+      <div class="stats">
+        <span id="streamCount">0</span> media files detected
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="refreshBtn" class="btn btn-secondary">
+        🔄 Refresh
+      </button>
+      <button id="clearBtn" class="btn btn-danger">
+        🗑️ Clear All
+      </button>
+      <div class="settings">
+        <label for="concurrentDownloads">Concurrent Downloads:</label>
+        <select id="concurrentDownloads">
+          <option value="3">3</option>
+          <option value="6" selected>6</option>
+          <option value="10">10</option>
+          <option value="15">15</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="loadingIndicator" class="loading">
+        <div class="spinner"></div>
+        <p>Scanning for media files...</p>
+      </div>
+
+      <div id="noStreams" class="no-streams" style="display: none;">
+        <div class="empty-state">
+          <h3>🔍 No media files detected</h3>
+          <p>Navigate to a page with video or audio content, or refresh this popup.</p>
+          <ul class="tips">
+            <li>Visit video streaming sites (YouTube, Vimeo, etc.)</li>
+            <li>Look for MP4, MP3, M3U8, and other media files</li>
+            <li>Play a video to help detection</li>
+            <li>Make sure the page has loaded completely</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="streamsList" class="streams-list" style="display: none;">
+        <!-- Media files will be populated here -->
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="help-text">
+        <small>💡 This extension detects all types of media files: MP4, AVI, MP3, FLAC, M3U8 streams, and more. Click download to save them to your computer.</small>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 

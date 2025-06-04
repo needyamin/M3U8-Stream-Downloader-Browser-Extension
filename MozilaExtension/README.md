@@ -260,6 +260,3 @@ This project is open source under the MIT License. See `LICENSE` file for detail
 **🎬 Start downloading media with ease!** 
 
 *Built with ❤️ for the web community*
-
-// Firefox compatibility layer in all scripts
-const browserAPI = typeof browser !== 'undefined' ? browser : chrome;

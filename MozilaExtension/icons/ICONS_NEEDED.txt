@@ -1,0 +1,33 @@
+REQUIRED ICON FILES FOR THE EXTENSION
+====================================
+
+To complete the M3U8 Stream Downloader extension, you need to add the following PNG icon files to this directory:
+
+1. icon16.png  (16x16 pixels)
+2. icon32.png  (32x32 pixels)
+3. icon48.png  (48x48 pixels)
+4. icon128.png (128x128 pixels)
+
+ICON DESIGN SUGGESTIONS:
+- Use a video/media-related icon (play button, download arrow, streaming symbol)
+- Colors: Blue/purple gradient to match the extension theme (#667eea, #764ba2)
+- Make sure the icon is recognizable at small sizes (16x16)
+- Use a transparent background
+- Keep the design simple and modern
+
+WHERE TO GET ICONS:
+- Create your own using image editing software
+- Download from icon libraries (Flaticon, Icons8, etc.)
+- Use online icon generators
+- Convert SVG icons to PNG
+
+EXAMPLE SEARCH TERMS:
+- "download video icon"
+- "streaming icon"
+- "HLS icon"
+- "video download arrow"
+- "media player icon"
+
+Once you add these files, the extension will be ready to install in Chrome!
+
+Note: The extension will not load properly without these icon files, as they are referenced in the manifest.json file. 
