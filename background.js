@@ -22,6 +22,20 @@ class MediaDownloader {
 
     // Listen for messages from content script and popup
     chrome.runtime.onMessage.addListener(this.onMessage.bind(this));
+
+    // Set initial badge
+    this.updateBadgeCount();
+  }
+
+  // Add new method to update badge count
+  updateBadgeCount() {
+    const count = this.detectedStreams.size;
+    if (count > 0) {
+      chrome.action.setBadgeText({ text: count.toString() });
+      chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
+    } else {
+      chrome.action.setBadgeText({ text: '' });
+    }
   }
 
   onBeforeRequest(details) {
@@ -89,6 +103,9 @@ class MediaDownloader {
       type: mediaType,
       fileSize: fileSize
     });
+
+    // Update badge count
+    this.updateBadgeCount();
 
     // Notify popup if open
     chrome.runtime.sendMessage({
@@ -178,6 +195,7 @@ class MediaDownloader {
       
       case 'CLEAR_STREAMS':
         this.detectedStreams.clear();
+        this.updateBadgeCount(); // Update badge when streams are cleared
         sendResponse({ success: true });
         break;
 

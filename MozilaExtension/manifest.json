@@ -1,11 +1,12 @@
 {
   "manifest_version": 2,
   "name": "Universal Media Downloader",
-  "version": "1.0.0",
-  "description": "Detect and Download all types of media files (Video, Audio, Streaming) including MP4, MP3, M3U8, and more",
+  "version": "2.1.0",
+  "description": "Automatically detect and download all types of media files including videos, audio, and streaming content from any website",
   
   "permissions": [
     "activeTab",
+    "tabs",
     "storage",
     "downloads",
     "webRequest",
@@ -21,7 +22,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   
@@ -43,13 +45,9 @@
     "128": "icons/icon128.png"
   },
   
-  "web_accessible_resources": [
-    "injected.js"
-  ],
-  
   "applications": {
     "gecko": {
-      "id": "universal-media-downloader@example.com",
+      "id": "universal-media-downloader@extension",
       "strict_min_version": "58.0"
     }
   }

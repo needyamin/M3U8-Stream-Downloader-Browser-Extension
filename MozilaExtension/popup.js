@@ -1,361 +1,334 @@
-// Popup script for Universal Media Downloader (Firefox Compatible)
+// Popup script for Universal Media Downloader (Firefox Compatible) - PRODUCTION VERSION
 
 // Firefox compatibility: Use browser API if available, fallback to chrome
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
-class M3U8PopupManager {
-  constructor() {
-    this.streams = new Map();
-    this.refreshInterval = null;
-    this.init();
-  }
+console.log('[UMD Popup] Popup script starting...');
 
-  init() {
-    this.setupEventListeners();
-    this.loadStreams();
-    // DISABLED: No more auto-refresh or user tracking
-    // this.startAutoRefresh();
-    // this.trackUserInteraction();
-  }
+// DOM elements
+let streamsList, refreshBtn, clearBtn, loadingIndicator, noStreams;
+let isLoading = false;
+let loadTimeout = null;
 
-  setupEventListeners() {
-    // Refresh button
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-      this.loadStreams();
-    });
-
-    // Clear button
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      this.clearAllStreams();
-    });
-
-    // DISABLED: Message listener that may cause constant updates
-    // browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    //   if (request.type === 'STREAM_DETECTED') {
-    //     this.loadStreams();
-    //   }
-    // });
-  }
-
-  async loadStreams() {
-    try {
-      const response = await browserAPI.runtime.sendMessage({ type: 'GET_STREAMS' });
-      if (response && response.streams) {
-        this.displayStreams(response.streams);
-      }
-    } catch (error) {
-      console.error('Failed to load streams:', error);
-      this.showError('Failed to load streams. Please try refreshing.');
-    }
-  }
-
-  displayStreams(streamsData) {
-    const streamCount = document.getElementById('streamCount');
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const noStreams = document.getElementById('noStreams');
-    const streamsList = document.getElementById('streamsList');
-
-    // Only update stream count if it actually changed
-    const newCount = streamsData.length;
-    if (streamCount.textContent !== newCount.toString()) {
-      streamCount.textContent = newCount;
-    }
-
-    // Hide loading indicator
-    if (loadingIndicator.style.display !== 'none') {
-      loadingIndicator.style.display = 'none';
-    }
-
-    if (streamsData.length === 0) {
-      if (noStreams.style.display !== 'block') {
-        noStreams.style.display = 'block';
-      }
-      if (streamsList.style.display !== 'none') {
-        streamsList.style.display = 'none';
-      }
-      return;
-    }
-
-    if (noStreams.style.display !== 'none') {
-      noStreams.style.display = 'none';
-    }
-    if (streamsList.style.display !== 'block') {
-      streamsList.style.display = 'block';
-    }
-
-    // Check if streams have actually changed before rebuilding
-    const currentStreamIds = Array.from(this.streams.keys()).sort();
-    const newStreamIds = streamsData.map(([id]) => id).sort();
-    const hasChanges = JSON.stringify(currentStreamIds) !== JSON.stringify(newStreamIds);
-
-    // Only rebuild if there are actual changes
-    if (!hasChanges && streamsList.children.length > 0) {
-      return; // No changes, don't rebuild UI
-    }
-
-    // Clear existing streams only if needed
-    if (streamsList.children.length > 0) {
-      streamsList.innerHTML = '';
-    }
-
-    // Add each stream
-    streamsData.forEach(([streamId, streamData]) => {
-      const streamElement = this.createStreamElement(streamId, streamData);
-      streamsList.appendChild(streamElement);
-      this.streams.set(streamId, streamData);
-    });
-  }
-
-  createStreamElement(streamId, streamData) {
-    const streamItem = document.createElement('div');
-    streamItem.className = 'stream-item';
-    streamItem.innerHTML = `
-      <div class="stream-header">
-        <div class="stream-url" title="${streamData.url}">
-          ${this.truncateUrl(streamData.url)}
-        </div>
-        <div class="stream-status status-${streamData.status}">
-          ${this.getStatusText(streamData.status)}
-        </div>
-      </div>
-      
-      <div class="stream-info">
-        <span><strong>Type:</strong> ${streamData.type || 'Media File'}</span>
-        <span><strong>Size:</strong> ${streamData.fileSize || 'Unknown'}</span>
-      </div>
-      
-      <div class="stream-actions">
-        <input type="text" class="filename-input" placeholder="Enter filename (optional)" 
-               value="${this.generateFilename(streamData.url)}">
-        <button class="btn btn-primary download-btn" data-stream-id="${streamId}">
-          📥 Download
-        </button>
-      </div>
-      
-      <div class="stream-details">
-        <span>Detected: ${this.formatDate(streamData.detected)}</span>
-        <span>Tab ID: ${streamData.tabId}</span>
-      </div>
-      
-      ${streamData.status === 'downloading' ? `
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: 0%"></div>
-        </div>
-      ` : ''}
-      
-      ${streamData.error ? `
-        <div class="error-message" style="color: #c62828; font-size: 12px; margin-top: 8px;">
-          Error: ${streamData.error}
-        </div>
-      ` : ''}
-    `;
-
-    // Add download button event listener
-    const downloadBtn = streamItem.querySelector('.download-btn');
-    downloadBtn.addEventListener('click', () => {
-      this.downloadStream(streamId, streamItem);
-    });
-
-    return streamItem;
-  }
-
-  async downloadStream(streamId, streamElement) {
-    const filenameInput = streamElement.querySelector('.filename-input');
-    const downloadBtn = streamElement.querySelector('.download-btn');
-    const filename = filenameInput.value.trim() || 'stream';
-
-    try {
-      // Update UI
-      downloadBtn.disabled = true;
-      downloadBtn.innerHTML = '⏳ Starting...';
-      
-      // Get concurrent downloads setting
-      const concurrentDownloads = document.getElementById('concurrentDownloads').value;
-
-      // Send download request
-      const response = await browserAPI.runtime.sendMessage({
-        type: 'DOWNLOAD_STREAM',
-        streamId: streamId,
-        options: {
-          filename: filename,
-          concurrentDownloads: parseInt(concurrentDownloads)
-        }
-      });
-
-      if (response && response.success) {
-        downloadBtn.innerHTML = '📥 Downloading...';
-        downloadBtn.className = 'btn btn-success';
-        
-        // Add progress bar if not present
-        if (!streamElement.querySelector('.progress-bar')) {
-          const progressBar = document.createElement('div');
-          progressBar.className = 'progress-bar';
-          progressBar.innerHTML = '<div class="progress-fill" style="width: 0%"></div>';
-          streamElement.appendChild(progressBar);
-        }
-        
-        this.showNotification('Download started!', 'success');
-      } else {
-        throw new Error('Failed to start download');
-      }
-    } catch (error) {
-      console.error('Download failed:', error);
-      downloadBtn.disabled = false;
-      downloadBtn.innerHTML = '❌ Failed';
-      downloadBtn.className = 'btn btn-danger';
-      this.showNotification('Download failed: ' + error.message, 'error');
-    }
-  }
-
-  async clearAllStreams() {
-    try {
-      await browserAPI.runtime.sendMessage({ type: 'CLEAR_STREAMS' });
-      this.streams.clear();
-      this.loadStreams();
-      this.showNotification('All streams cleared', 'info');
-    } catch (error) {
-      console.error('Failed to clear streams:', error);
-      this.showNotification('Failed to clear streams', 'error');
-    }
-  }
-
-  truncateUrl(url) {
-    if (!url) return 'Unknown URL';
-    if (url.length <= 40) return url;
+// Initialize popup interface
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[UMD Popup] DOM loaded, initializing...');
     
-    // Consistent truncation to prevent layout shifts
-    const start = url.substring(0, 20);
-    const end = url.substring(url.length - 15);
-    return start + '...' + end;
-  }
-
-  getStatusText(status) {
-    const statusMap = {
-      'detected': 'Detected',
-      'downloading': 'Downloading',
-      'completed': 'Completed',
-      'failed': 'Failed'
-    };
-    return statusMap[status] || status;
-  }
-
-  generateFilename(url) {
-    try {
-      if (!url) return 'media';
-      
-      const urlObj = new URL(url);
-      const pathname = urlObj.pathname;
-      let filename = pathname.split('/').pop();
-      
-      if (!filename || filename.length < 2) {
-        filename = 'media';
-      }
-      
-      // Remove extension for input field
-      filename = filename.replace(/\.[^/.]+$/, '');
-      
-      // Limit filename length to prevent layout issues
-      if (filename.length > 20) {
-        filename = filename.substring(0, 20);
-      }
-      
-      return filename || 'media';
-    } catch (e) {
-      return 'media';
-    }
-  }
-
-  formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString();
-  }
-
-  showNotification(message, type = 'info') {
-    // Simplified static notification to prevent layout shifts
-    console.log(`[${type.toUpperCase()}] ${message}`);
+    // Get DOM elements
+    streamsList = document.getElementById('streamsList');
+    refreshBtn = document.getElementById('refreshBtn');
+    clearBtn = document.getElementById('clearBtn');
+    loadingIndicator = document.getElementById('loadingIndicator');
+    noStreams = document.getElementById('noStreams');
     
-    // Create a simple non-animated notification
-    const existing = document.querySelector('.static-notification');
-    if (existing) {
-      existing.remove();
-    }
+    // Set up event listeners
+    refreshBtn.addEventListener('click', handleRefresh);
+    clearBtn.addEventListener('click', handleClearAll);
     
-    const notification = document.createElement('div');
-    notification.className = 'static-notification';
-    notification.textContent = message;
-    notification.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      padding: 8px 12px;
-      border-radius: 4px;
-      color: white;
-      font-size: 12px;
-      z-index: 10000;
-      max-width: 180px;
-      word-wrap: break-word;
-      pointer-events: none;
-    `;
+    // Load streams immediately
+    loadStreams();
     
-    // Set background color based on type
-    const colors = {
-      success: '#28a745',
-      error: '#dc3545',
-      info: '#17a2b8',
-      warning: '#ffc107'
-    };
-    notification.style.backgroundColor = colors[type] || colors.info;
-    
-    document.body.appendChild(notification);
-    
-    // Remove after delay without any animation
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    }, 2000);
-  }
-
-  showError(message) {
-    const content = document.querySelector('.content');
-    content.innerHTML = `
-      <div class="error-state" style="text-align: center; padding: 40px 20px; color: #dc3545;">
-        <h3>❌ Error</h3>
-        <p style="margin: 12px 0; line-height: 1.5;">${message}</p>
-        <button class="btn btn-primary" onclick="location.reload()">
-          🔄 Retry
-        </button>
-      </div>
-    `;
-  }
-
-  startAutoRefresh() {
-    // DISABLED: Auto-refresh causing shaking - only manual refresh now
-    // this.refreshInterval = setInterval(() => {
-    //   const timeSinceInteraction = Date.now() - this.lastUserInteraction;
-    //   if (document.visibilityState === 'visible' && timeSinceInteraction > 3000) {
-    //     this.loadStreams();
-    //   }
-    // }, 10000);
-  }
-
-  stopAutoRefresh() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-    }
-  }
-
-  // REMOVED: trackUserInteraction method - no longer needed
-}
-
-// Initialize popup when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  new M3U8PopupManager();
+    console.log('[UMD Popup] ✅ Popup initialized');
 });
 
-// Cleanup when popup is closed
-window.addEventListener('beforeunload', () => {
-  if (window.popupManager) {
-    window.popupManager.stopAutoRefresh();
-  }
-}); 
+// Enhanced refresh functionality
+async function handleRefresh() {
+    if (isLoading) {
+        console.log('[UMD Popup] Already refreshing, skipping...');
+        return;
+    }
+    
+    console.log('[UMD Popup] 🔄 Refresh requested');
+    
+    isLoading = true;
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '🔄 Scanning...';
+    
+    // Show loading state
+    loadingIndicator.style.display = 'flex';
+    streamsList.style.display = 'none';
+    noStreams.style.display = 'none';
+    
+    try {
+        // Get current active tab
+        const tabs = await browserAPI.tabs.query({ active: true, currentWindow: true });
+        const currentTab = tabs[0];
+        
+        if (!currentTab) {
+            throw new Error('No active tab found');
+        }
+        
+        // Clear tab-specific streams from background
+        await browserAPI.runtime.sendMessage({
+            type: 'CLEAR_TAB_STREAMS',
+            tabId: currentTab.id
+        });
+        
+        // Request content script to scan for media
+        await browserAPI.tabs.sendMessage(currentTab.id, {
+            type: 'SCAN_MEDIA'
+        });
+        
+        // Wait a moment for media to be detected
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Load updated streams
+        await loadStreams();
+        
+    } catch (error) {
+        console.error('[UMD Popup] ❌ Refresh error:', error);
+        noStreams.style.display = 'block';
+        streamsList.style.display = 'none';
+    } finally {
+        isLoading = false;
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = '🔄 Refresh';
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+// Load and display streams
+async function loadStreams() {
+    console.log('[UMD Popup] 📊 Loading streams...');
+    
+    // Clear any existing timeout
+    if (loadTimeout) {
+        clearTimeout(loadTimeout);
+    }
+    
+    try {
+        // Get streams from background script
+        const response = await browserAPI.runtime.sendMessage({
+            type: 'GET_STREAMS'
+        });
+        
+        if (response && response.streams) {
+            const streams = response.streams;
+            console.log('[UMD Popup] Received', streams.length, 'streams');
+            
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            if (streams.length === 0) {
+                noStreams.style.display = 'block';
+                streamsList.style.display = 'none';
+            } else {
+                noStreams.style.display = 'none';
+                streamsList.style.display = 'block';
+                displayStreams(streams);
+            }
+            
+            // Update stream count
+            document.getElementById('streamCount').textContent = streams.length;
+            
+        } else {
+            console.log('[UMD Popup] No streams response or empty response');
+            loadingIndicator.style.display = 'none';
+            noStreams.style.display = 'block';
+            streamsList.style.display = 'none';
+            document.getElementById('streamCount').textContent = '0';
+        }
+        
+    } catch (error) {
+        console.error('[UMD Popup] ❌ Failed to load streams:', error);
+        loadingIndicator.style.display = 'none';
+        noStreams.style.display = 'block';
+        streamsList.style.display = 'none';
+        document.getElementById('streamCount').textContent = '0';
+    }
+}
+
+// Display streams in the UI
+function displayStreams(streams) {
+    console.log('[UMD Popup] Displaying', streams.length, 'streams');
+    
+    if (!streamsList) {
+        console.error('[UMD Popup] Streams list element not found');
+        return;
+    }
+    
+    // Clear current list
+    streamsList.innerHTML = '';
+    
+    streams.forEach(([streamId, streamData]) => {
+        const streamElement = createStreamElement(streamId, streamData);
+        streamsList.appendChild(streamElement);
+    });
+    
+    // Update Clear button state
+    clearBtn.disabled = streams.length === 0;
+}
+
+// Create stream element
+function createStreamElement(streamId, streamData) {
+    console.log('[UMD Popup] Creating stream element for:', streamId, streamData);
+    
+    const div = document.createElement('div');
+    div.className = 'stream-item';
+    
+    // Extract filename from URL
+    let filename = 'Unknown File';
+    try {
+        const urlObj = new URL(streamData.url);
+        filename = urlObj.pathname.split('/').pop() || 'media_file';
+        if (filename.length > 30) {
+            filename = filename.substring(0, 27) + '...';
+        }
+    } catch (e) {
+        console.error('[UMD Popup] Error parsing URL:', e);
+        filename = 'media_file';
+    }
+    
+    // Format detected time
+    const detectedTime = streamData.detected ? 
+        new Date(streamData.detected).toLocaleTimeString() : 'Unknown';
+    
+    // Format file size
+    const fileSize = streamData.size ? formatFileSize(streamData.size) : 'Unknown size';
+    
+    // Status indicator
+    let statusIcon = '📄';
+    if (streamData.status === 'downloading') statusIcon = '⬇️';
+    else if (streamData.status === 'completed') statusIcon = '✅';
+    else if (streamData.status === 'failed') statusIcon = '❌';
+    
+    const buttonHtml = `
+        <button class="download-btn" 
+                data-stream-id="${streamId}"
+                ${streamData.status === 'downloading' ? 'disabled' : ''}>
+            ${getDownloadButtonText(streamData.status)}
+        </button>
+    `;
+    
+    div.innerHTML = `
+        <div class="stream-info">
+            <div class="stream-title">${statusIcon} ${streamData.type || 'Media File'}</div>
+            <div class="stream-details">
+                <div><strong>File:</strong> ${filename}</div>
+                <div><strong>Size:</strong> ${fileSize}</div>
+                <div><strong>Source:</strong> ${streamData.source || 'unknown'}</div>
+                <div><strong>Detected:</strong> ${detectedTime}</div>
+            </div>
+        </div>
+        <div class="stream-actions">
+            ${buttonHtml}
+        </div>
+    `;
+    
+    // Add click event listener to the button
+    const button = div.querySelector('.download-btn');
+    if (button) {
+        button.addEventListener('click', () => downloadStream(streamId));
+    }
+    
+    return div;
+}
+
+// Get download button text based on status
+function getDownloadButtonText(status) {
+    switch (status) {
+        case 'downloading':
+            return '⬇️ Downloading...';
+        case 'completed':
+            return '✅ Downloaded';
+        case 'failed':
+            return '❌ Failed';
+        default:
+            return '📥 Download';
+    }
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (!bytes) return 'Unknown size';
+    if (bytes === 'stream') return 'Streaming';
+    
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+    
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+// Download specific stream
+async function downloadStream(streamId) {
+    console.log('[UMD Popup] Download requested for:', streamId);
+    
+    try {
+        // Disable the button immediately
+        const button = document.querySelector(`button[data-stream-id="${streamId}"]`);
+        if (button) {
+            console.log('[UMD Popup] Disabling download button');
+            button.disabled = true;
+            button.innerHTML = '⬇️ Downloading...';
+        } else {
+            console.error('[UMD Popup] Could not find download button');
+        }
+        
+        console.log('[UMD Popup] Sending download message to background script');
+        const response = await browserAPI.runtime.sendMessage({
+            type: 'DOWNLOAD_STREAM',
+            streamId: streamId
+        });
+        
+        console.log('[UMD Popup] Received response from background:', response);
+        
+        if (response && response.success) {
+            console.log('[UMD Popup] ✅ Download started');
+            // The button will be updated when we refresh the streams
+            setTimeout(() => {
+                console.log('[UMD Popup] Refreshing streams list');
+                loadStreams();
+            }, 1000);
+        } else {
+            throw new Error(response?.error || 'Download failed');
+        }
+    } catch (error) {
+        console.error('[UMD Popup] ❌ Download error:', error);
+        // Reset the button state
+        const button = document.querySelector(`button[data-stream-id="${streamId}"]`);
+        if (button) {
+            console.log('[UMD Popup] Resetting button state after error');
+            button.disabled = false;
+            button.innerHTML = '📥 Download';
+        }
+    }
+}
+
+// Clear all detected streams
+async function handleClearAll() {
+    console.log('[UMD Popup] Clear all requested');
+    
+    try {
+        const response = await browserAPI.runtime.sendMessage({
+            type: 'CLEAR_STREAMS'
+        });
+        
+        if (response && response.success) {
+            console.log('[UMD Popup] ✅ Cleared', response.cleared, 'streams');
+            loadStreams();
+        } else {
+            throw new Error('Failed to clear streams');
+        }
+    } catch (error) {
+        console.error('[UMD Popup] ❌ Clear error:', error);
+    }
+}
+
+// Make download function globally available
+window.downloadStream = downloadStream;
+
+// Auto-refresh when popup is opened (but not too frequently)
+setTimeout(() => {
+    if (!isLoading) {
+        console.log('[UMD Popup] Auto-refresh on popup open');
+        loadStreams();
+    }
+}, 500);
+
+console.log('[UMD Popup] ✅ Popup script loaded and ready'); 
